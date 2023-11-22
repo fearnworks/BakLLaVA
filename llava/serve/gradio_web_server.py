@@ -126,7 +126,8 @@ def clear_history(request: gr.Request):
     return (state, state.to_gradio_chatbot(), "", None) + (disable_btn,) * 5
 
 
-def add_text(state, text, image, image_process_mode, request: gr.Request):
+def add_text(state, system_prompt, text, image, image_process_mode, request: gr.Request):
+    text = system_prompt + text
     logger.info(f"add_text. ip: {request.client.host}. len: {len(text)}")
     if len(text) <= 0 and image is None:
         state.skip_next = True
@@ -307,6 +308,8 @@ block_css = """
 
 def build_demo(embed_mode):
     textbox = gr.Textbox(show_label=False, placeholder="Enter text and press ENTER", container=False)
+
+
     with gr.Blocks(title="LLaVA", theme=gr.themes.Default(), css=block_css) as demo:
         state = gr.State()
 
@@ -373,14 +376,14 @@ def build_demo(embed_mode):
             http_bot, [state, model_selector, temperature, top_p, max_output_tokens],
             [state, chatbot] + btn_list)
         clear_btn.click(clear_history, None, [state, chatbot, textbox, imagebox] + btn_list)
-
-        textbox.submit(add_text, [state, textbox, imagebox, image_process_mode], [state, chatbot, textbox, imagebox] + btn_list
+        system_prompt = gr.Textbox(label="System Prompt", placeholder="Enter system prompt here", container=False)  # New system prompt input
+        textbox.submit(add_text, [state, system_prompt, textbox, imagebox, image_process_mode], [state, chatbot, textbox, imagebox] + btn_list
             ).then(http_bot, [state, model_selector, temperature, top_p, max_output_tokens],
                    [state, chatbot] + btn_list)
-        submit_btn.click(add_text, [state, textbox, imagebox, image_process_mode], [state, chatbot, textbox, imagebox] + btn_list
+        submit_btn.click(add_text, [state, system_prompt, textbox, imagebox, image_process_mode], [state, chatbot, textbox, imagebox] + btn_list
             ).then(http_bot, [state, model_selector, temperature, top_p, max_output_tokens],
                    [state, chatbot] + btn_list)
-
+            
         if args.model_list_mode == "once":
             demo.load(load_demo, [url_params], [state, model_selector],
                 _js=get_window_url_params)
