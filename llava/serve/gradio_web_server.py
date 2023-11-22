@@ -15,7 +15,7 @@ from llava.utils import (build_logger, server_error_msg,
 import hashlib
 
 
-logger = build_logger("gradio_web_server", "gradio_web_server.log")
+logger = build_logger("gradio_web_server", "logs/gradio_web_server.log")
 
 headers = {"User-Agent": "LLaVA Client"}
 

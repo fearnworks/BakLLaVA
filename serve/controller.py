@@ -2,27 +2,30 @@
 A controller manages distributed workers.
 It sends worker addresses to clients.
 """
-import argparse
-import asyncio
-import dataclasses
-from enum import Enum, auto
-import json
-import logging
-import time
-from typing import List, Union
-import threading
 
-from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
-import numpy as np
-import requests
 import uvicorn
+import requests
+import numpy as np
+from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, Request
+import threading
+from typing import List, Union
+import time
+import logging
+import json
+from enum import Enum, auto
+import dataclasses
+import asyncio
+import argparse
+import sys
+import os
 
-from llava.constants import CONTROLLER_HEART_BEAT_EXPIRATION
-from llava.utils import build_logger, server_error_msg
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
+from serve.utils import build_logger, server_error_msg
+from serve.constants import CONTROLLER_HEART_BEAT_EXPIRATION
 
-logger = build_logger("controller", "logs/controller.log")
+logger = build_logger("controller", "controller.log")
 
 
 class DispatchMethod(Enum):
@@ -132,14 +135,14 @@ class Controller:
             worker_speeds = worker_speeds / norm
             if True:  # Directly return address
                 pt = np.random.choice(np.arange(len(worker_names)),
-                    p=worker_speeds)
+                                      p=worker_speeds)
                 worker_name = worker_names[pt]
                 return worker_name
 
             # Check status before returning
             while True:
                 pt = np.random.choice(np.arange(len(worker_names)),
-                    p=worker_speeds)
+                                      p=worker_speeds)
                 worker_name = worker_names[pt]
 
                 if self.get_worker_status(worker_name):
@@ -165,10 +168,12 @@ class Controller:
             min_index = np.argmin(worker_qlen)
             w_name = worker_names[min_index]
             self.worker_info[w_name].queue_length += 1
-            logger.info(f"names: {worker_names}, queue_lens: {worker_qlen}, ret: {w_name}")
+            logger.info(
+                f"names: {worker_names}, queue_lens: {worker_qlen}, ret: {w_name}")
             return w_name
         else:
-            raise ValueError(f"Invalid dispatch method: {self.dispatch_method}")
+            raise ValueError(
+                f"Invalid dispatch method: {self.dispatch_method}")
 
     def receive_heart_beat(self, worker_name: str, queue_length: int):
         if worker_name not in self.worker_info:
@@ -202,7 +207,7 @@ class Controller:
 
         try:
             response = requests.post(worker_addr + "/worker_generate_stream",
-                json=params, stream=True, timeout=5)
+                                     json=params, stream=True, timeout=5)
             for chunk in response.iter_lines(decode_unicode=False, delimiter=b"\0"):
                 if chunk:
                     yield chunk + b"\0"
@@ -214,9 +219,9 @@ class Controller:
             }
             yield json.dumps(ret).encode() + b"\0"
 
-
     # Let the controller act as a worker to achieve hierarchical
     # management. This can be used to connect isolated sub networks.
+
     def worker_api_get_status(self):
         model_names = set()
         speed = 0

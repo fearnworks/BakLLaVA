@@ -9,7 +9,7 @@ services:
       dockerfile: ./docker/Dockerfile
     volumes:
       - .:/code:rx
-    command: /bin/bash -c "/workspace/docker/run_controller.sh"
+    command: tini -- /bin/bash -c "/workspace/docker/run_controller.sh"
     ports:
       - "10000:10000"
     networks:
@@ -21,7 +21,7 @@ services:
       dockerfile: ./docker/Dockerfile
     volumes:
       - .:/code:rx
-    command: /bin/bash -c "/workspace/docker/run_webui.sh"
+    command: tini -- /bin/bash -c "/workspace/docker/run_webui.sh"
     ports:
       - "11000:11000"
     networks:
@@ -32,11 +32,11 @@ services:
   model_worker:
     build:
       context: .
-      dockerfile: ./docker/Dockerfile
-    image: bakllava:latest
+      dockerfile: ./docker/ModelWorker.Dockerfile
+    image: bakllava_model:latest
     environment:
       - HUGGINGFACE_API_TOKEN=${HUGGINGFACE_API_TOKEN}
-    command: /bin/bash -c "/workspace/docker/run_model_worker.sh"
+    command: tini -- /bin/bash -c "/workspace/docker/run_model_worker.sh"
     volumes:
       - .:/code:rx
       - ./models:/models:rwx
@@ -53,6 +53,27 @@ services:
       - "40000:40000"
     depends_on:
       - controller
+
+  grounded_sam:
+    image: gsa:v0
+    environment:
+      - HUGGINGFACE_API_TOKEN=${HUGGINGFACE_API_TOKEN}
+    command:  /bin/bash -c "/code/docker/run_grounded_sam.sh"
+    volumes:
+      - .:/code:rx
+      - ./models:/models:rwx
+    networks:
+      - bakllava
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "41000:41000"
+
 
 networks:
   bakllava:

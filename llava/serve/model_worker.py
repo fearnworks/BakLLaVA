@@ -28,7 +28,7 @@ from threading import Thread
 GB = 1 << 30
 
 worker_id = str(uuid.uuid4())[:6]
-logger = build_logger("model_worker", f"model_worker_{worker_id}.log")
+logger = build_logger("model_worker", f"logs/model_worker_{worker_id}.log")
 global_counter = 0
 
 model_semaphore = None

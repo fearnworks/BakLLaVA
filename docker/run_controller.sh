@@ -7,6 +7,6 @@ source /miniconda/etc/profile.d/conda.sh
 
 conda activate llava
 
-cd /workspace
+cd /code
 
 python3 -m llava.serve.controller --host 0.0.0.0 --port 10000

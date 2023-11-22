@@ -1,3 +1,6 @@
+## mm_utils.py
+import logging 
+
 from PIL import Image
 from io import BytesIO
 import base64
@@ -6,6 +9,7 @@ import torch
 from transformers import StoppingCriteria
 from llava.constants import IMAGE_TOKEN_INDEX
 
+logger = logging.getLogger(__name__)
 
 def load_image_from_base64(image):
     return Image.open(BytesIO(base64.b64decode(image)))
@@ -24,20 +28,42 @@ def expand2square(pil_img, background_color):
         result.paste(pil_img, ((height - width) // 2, 0))
         return result
 
+def process_image_with_sam(image):
+    """
+    Processes images through SAM to generate segmented patches.
+    """
+    # sam = load_sam() # will likely want to load this once and save it off somewhere
+    # segmented_patches = [sam.segment_image(image) for image in images]
+    logger.info("process_image_with_sam")
+    segmented_patches = [image, image]
+    return segmented_patches
 
 def process_images(images, image_processor, model_cfg):
+    logger.info("process_images")
     image_aspect_ratio = getattr(model_cfg, "image_aspect_ratio", None)
-    new_images = []
+    processed_images = []
+    segmented_patches = []
+
+    # Preprocess images based on aspect ratio settings
     if image_aspect_ratio == 'pad':
         for image in images:
-            image = expand2square(image, tuple(int(x*255) for x in image_processor.image_mean))
-            image = image_processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
-            new_images.append(image)
+            image = expand2square(image, tuple(int(x * 255) for x in image_processor.image_mean))
+            processed_image = image_processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+            processed_images.append(processed_image)
     else:
-        return image_processor(images, return_tensors='pt')['pixel_values']
-    if all(x.shape == new_images[0].shape for x in new_images):
-        new_images = torch.stack(new_images, dim=0)
-    return new_images
+        processed_images = image_processor(images, return_tensors='pt')['pixel_values']
+
+    # Segment each preprocessed image using SAM
+    for image in processed_images:
+        # Assuming SAM processes a single image and returns a list of segmented patches
+        patches = process_image_with_sam(image)
+        segmented_patches.extend(patches)
+
+    # Ensure all patches have the same shape and stack them
+    if all(patch.shape == segmented_patches[0].shape for patch in segmented_patches):
+        return torch.stack(segmented_patches, dim=0)
+    else:
+        raise ValueError("Segmented patches have inconsistent shapes.")
 
 
 def tokenizer_image_token(prompt, tokenizer, image_token_index=IMAGE_TOKEN_INDEX, return_tensors=None):
