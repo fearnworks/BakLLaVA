@@ -22,3 +22,4 @@ einops-exts==0.0.4
 timm==0.6.13
 supervision==0.10.0
 loguru
+python-dotenv

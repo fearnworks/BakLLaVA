@@ -13,10 +13,11 @@ from typing import List, Optional
 def maybe_zero_3(param, ignore_status=False, name=None):
     from deepspeed import zero
     from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
+
     if hasattr(param, "ds_id"):
         if param.ds_status == ZeroParamStatus.NOT_AVAILABLE:
             if not ignore_status:
-                print(name, 'no ignore status')
+                print(name, "no ignore status")
         with zero.GatheredParameters([param]):
             param = param.data.detach().cpu().clone()
     else:
@@ -25,8 +26,15 @@ def maybe_zero_3(param, ignore_status=False, name=None):
 
 
 def get_mm_adapter_state_maybe_zero_3(named_params, keys_to_match):
-    to_return = {k: t for k, t in named_params if any(key_match in k for key_match in keys_to_match)}
-    to_return = {k: maybe_zero_3(v, ignore_status=True, name=k).cpu() for k, v in to_return.items()}
+    to_return = {
+        k: t
+        for k, t in named_params
+        if any(key_match in k for key_match in keys_to_match)
+    }
+    to_return = {
+        k: maybe_zero_3(v, ignore_status=True, name=k).cpu()
+        for k, v in to_return.items()
+    }
     return to_return
 
 
@@ -52,7 +60,9 @@ def split_to_even_chunks(indices, lengths, num_chunks):
     return chunks
 
 
-def get_modality_length_grouped_indices(lengths, batch_size, world_size, generator=None):
+def get_modality_length_grouped_indices(
+    lengths, batch_size, world_size, generator=None
+):
     # We need to use torch for the random part as a distributed sampler will set the random seed for torch.
     assert all(l != 0 for l in lengths), "Should not have zero length."
     mm_indices, mm_lengths = zip(*[(i, l) for i, l in enumerate(lengths) if l > 0])
@@ -61,11 +71,27 @@ def get_modality_length_grouped_indices(lengths, batch_size, world_size, generat
     assert len(mm_indices) > 0, "Should have at least one multimodal sample."
     assert len(lang_indices) > 0, "Should have at least one language sample."
 
-    mm_shuffle = [mm_indices[i] for i in get_length_grouped_indices(mm_lengths, batch_size, world_size, generator=None)]
-    lang_shuffle = [lang_indices[i] for i in get_length_grouped_indices(lang_lengths, batch_size, world_size, generator=None)]
+    mm_shuffle = [
+        mm_indices[i]
+        for i in get_length_grouped_indices(
+            mm_lengths, batch_size, world_size, generator=None
+        )
+    ]
+    lang_shuffle = [
+        lang_indices[i]
+        for i in get_length_grouped_indices(
+            lang_lengths, batch_size, world_size, generator=None
+        )
+    ]
     megabatch_size = world_size * batch_size
-    mm_megabatches = [mm_shuffle[i : i + megabatch_size] for i in range(0, len(mm_shuffle), megabatch_size)]
-    lang_megabatches = [lang_shuffle[i : i + megabatch_size] for i in range(0, len(lang_shuffle), megabatch_size)]
+    mm_megabatches = [
+        mm_shuffle[i : i + megabatch_size]
+        for i in range(0, len(mm_shuffle), megabatch_size)
+    ]
+    lang_megabatches = [
+        lang_shuffle[i : i + megabatch_size]
+        for i in range(0, len(lang_shuffle), megabatch_size)
+    ]
 
     last_mm = mm_megabatches[-1]
     last_lang = lang_megabatches[-1]
@@ -84,13 +110,24 @@ def get_modality_length_grouped_indices(lengths, batch_size, world_size, generat
     return [i for megabatch in megabatches for i in megabatch]
 
 
-def get_length_grouped_indices(lengths, batch_size, world_size, generator=None, merge=True):
+def get_length_grouped_indices(
+    lengths, batch_size, world_size, generator=None, merge=True
+):
     # We need to use torch for the random part as a distributed sampler will set the random seed for torch.
     indices = torch.randperm(len(lengths), generator=generator)
     megabatch_size = world_size * batch_size
-    megabatches = [indices[i : i + megabatch_size].tolist() for i in range(0, len(lengths), megabatch_size)]
-    megabatches = [sorted(megabatch, key=lambda i: lengths[i], reverse=True) for megabatch in megabatches]
-    megabatches = [split_to_even_chunks(megabatch, lengths, world_size) for megabatch in megabatches]
+    megabatches = [
+        indices[i : i + megabatch_size].tolist()
+        for i in range(0, len(lengths), megabatch_size)
+    ]
+    megabatches = [
+        sorted(megabatch, key=lambda i: lengths[i], reverse=True)
+        for megabatch in megabatches
+    ]
+    megabatches = [
+        split_to_even_chunks(megabatch, lengths, world_size)
+        for megabatch in megabatches
+    ]
 
     return [i for megabatch in megabatches for batch in megabatch for i in batch]
 
@@ -123,14 +160,17 @@ class LengthGroupedSampler(Sampler):
 
     def __iter__(self):
         if self.group_by_modality:
-            indices = get_modality_length_grouped_indices(self.lengths, self.batch_size, self.world_size, generator=self.generator)
+            indices = get_modality_length_grouped_indices(
+                self.lengths, self.batch_size, self.world_size, generator=self.generator
+            )
         else:
-            indices = get_length_grouped_indices(self.lengths, self.batch_size, self.world_size, generator=self.generator)
+            indices = get_length_grouped_indices(
+                self.lengths, self.batch_size, self.world_size, generator=self.generator
+            )
         return iter(indices)
 
 
 class LLaVATrainer(Trainer):
-
     def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
         if self.train_dataset is None or not has_length(self.train_dataset):
             return None
@@ -148,28 +188,33 @@ class LLaVATrainer(Trainer):
             return super()._get_train_sampler()
 
     def _save_checkpoint(self, model, trial, metrics=None):
-        if getattr(self.args, 'tune_mm_mlp_adapter', False):
+        if getattr(self.args, "tune_mm_mlp_adapter", False):
             from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
+
             checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
 
             run_dir = self._get_output_dir(trial=trial)
             output_dir = os.path.join(run_dir, checkpoint_folder)
 
             # Only save Adapter
-            keys_to_match = ['mm_projector', 'vision_resampler']
+            keys_to_match = ["mm_projector", "vision_resampler"]
             if getattr(self.args, "use_im_start_end", False):
-                keys_to_match.extend(['embed_tokens', 'embed_in'])
+                keys_to_match.extend(["embed_tokens", "embed_in"])
 
-            weight_to_save = get_mm_adapter_state_maybe_zero_3(self.model.named_parameters(), keys_to_match)
+            weight_to_save = get_mm_adapter_state_maybe_zero_3(
+                self.model.named_parameters(), keys_to_match
+            )
 
             if self.args.local_rank == 0 or self.args.local_rank == -1:
                 self.model.config.save_pretrained(output_dir)
-                torch.save(weight_to_save, os.path.join(output_dir, f'mm_projector.bin'))
+                torch.save(
+                    weight_to_save, os.path.join(output_dir, f"mm_projector.bin")
+                )
         else:
             super(LLaVATrainer, self)._save_checkpoint(model, trial, metrics)
 
     def _save(self, output_dir: Optional[str] = None, state_dict=None):
-        if getattr(self.args, 'tune_mm_mlp_adapter', False):
+        if getattr(self.args, "tune_mm_mlp_adapter", False):
             pass
         else:
             super(LLaVATrainer, self)._save(output_dir, state_dict)

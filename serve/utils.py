@@ -16,7 +16,9 @@ import torch
 
 from serve.constants import LOGDIR
 
-server_error_msg = "**NETWORK ERROR DUE TO HIGH TRAFFIC. PLEASE REGENERATE OR REFRESH THIS PAGE.**"
+server_error_msg = (
+    "**NETWORK ERROR DUE TO HIGH TRAFFIC. PLEASE REGENERATE OR REFRESH THIS PAGE.**"
+)
 
 handler = None
 visited_loggers = set()

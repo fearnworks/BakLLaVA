@@ -19,7 +19,7 @@ import pycocotools.mask as mask_util
 
 
 def load_image(image_path):
-    img = Image.open(image_path).convert('RGB')
+    img = Image.open(image_path).convert("RGB")
     # import ipdb; ipdb.set_trace()
     # resize if needed
     w, h = img.size
@@ -34,24 +34,29 @@ def load_image(image_path):
         img = F.resize(img, (new_h, new_w))
     return img
 
+
 def encode(image: Image):
     buffered = BytesIO()
     image.save(buffered, format="JPEG")
     img_b64_str = base64.b64encode(buffered.getvalue()).decode()
     return img_b64_str
 
+
 def show_mask(mask, image, random_color=True):
     if random_color:
         color = np.concatenate([np.random.random(3), np.array([0.8])], axis=0)
     else:
-        color = np.array([30/255, 144/255, 255/255, 0.6])
+        color = np.array([30 / 255, 144 / 255, 255 / 255, 0.6])
     h, w = mask.shape[-2:]
     mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
-    
+
     annotated_frame_pil = Image.fromarray(image).convert("RGBA")
-    mask_image_pil = Image.fromarray((mask_image.cpu().numpy() * 255).astype(np.uint8)).convert("RGBA")
+    mask_image_pil = Image.fromarray(
+        (mask_image.cpu().numpy() * 255).astype(np.uint8)
+    ).convert("RGBA")
 
     return np.array(Image.alpha_composite(annotated_frame_pil, mask_image_pil))
+
 
 def main():
     model_name = args.model_name
@@ -111,13 +116,15 @@ def main():
     res = response.json()
     # import ipdb; ipdb.set_trace()
     boxes = torch.Tensor(res["boxes"])
-    logits =  torch.Tensor(res["logits"])
+    logits = torch.Tensor(res["logits"])
     phrases = res["phrases"]
     if img is not None:
         image_source = np.array(img.convert("RGB"))
     else:
         image_source = np.array(Image.open(args.image_path).convert("RGB"))
-    annotated_frame = annotate(image_source=image_source, boxes=boxes, logits=logits, phrases=phrases)
+    annotated_frame = annotate(
+        image_source=image_source, boxes=boxes, logits=logits, phrases=phrases
+    )
     # cv2.imwrite("annotated_image.jpg", annotated_frame)
 
     # show mask
@@ -128,6 +135,7 @@ def main():
         annotated_frame = show_mask(mask, annotated_frame)
     cv2.imwrite("annotated_image_mask.jpg", annotated_frame)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # worker parameters
@@ -135,23 +143,28 @@ if __name__ == "__main__":
         "--controller-address", type=str, default="http://localhost:41000"
     )
     parser.add_argument("--worker-address", type=str)
-    parser.add_argument("--model-name", type=str, default='grounded_sam')
+    parser.add_argument("--model-name", type=str, default="grounded_sam")
 
     # model parameters
+    parser.add_argument("--caption", type=str, default="dogs .")
     parser.add_argument(
-        "--caption", type=str, default="dogs ."
+        "--image_path",
+        type=str,
+        default="/home/liushilong/code/GroundingFolder/Grounded-Segment-Anything/assets/demo2.jpg",
     )
     parser.add_argument(
-        "--image_path", type=str, default="/home/liushilong/code/GroundingFolder/Grounded-Segment-Anything/assets/demo2.jpg"
+        "--box_threshold",
+        type=float,
+        default=0.3,
     )
     parser.add_argument(
-        "--box_threshold", type=float, default=0.3,
+        "--text_threshold",
+        type=float,
+        default=0.25,
     )
     parser.add_argument(
-        "--text_threshold", type=float, default=0.25,
-    )
-    parser.add_argument(
-        "--send_image", action="store_true",
+        "--send_image",
+        action="store_true",
     )
     args = parser.parse_args()
 

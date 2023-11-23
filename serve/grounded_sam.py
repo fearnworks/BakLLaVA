@@ -6,6 +6,7 @@ from groundingdino.util import box_ops
 
 from segment_anything import build_sam
 from segment_anything.predictor import SamPredictor
+
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 import argparse
@@ -104,8 +105,12 @@ class ModelWorker:
         self.grounding_dino_server = grounding_dino_server
 
         if grounding_dino_server is None:
-            raise NotImplementedError("grounding_dino_server is None, we only support grounding_dino_server now.")
-            logger.info(f"Loading the model {self.model_names} on worker {worker_id} ...")
+            raise NotImplementedError(
+                "grounding_dino_server is None, we only support grounding_dino_server now."
+            )
+            logger.info(
+                f"Loading the model {self.model_names} on worker {worker_id} ..."
+            )
             self.model = load_model(
                 model_config_path=model_config,
                 model_checkpoint_path=model_path,
@@ -127,12 +132,12 @@ class ModelWorker:
                 print(f"Models: {models}")
 
                 ret = requests.post(
-                    controller_addr + "/get_worker_address", json={"model": grounding_dino_server}
+                    controller_addr + "/get_worker_address",
+                    json={"model": grounding_dino_server},
                 )
                 grounding_dino_server_addr = ret.json()["address"]
             print(f"grounding_dino_server_addr: {grounding_dino_server_addr}")
             self.grounding_dino_server_addr = grounding_dino_server_addr
-
 
         if not no_register:
             self.register_to_controller()
@@ -177,8 +182,6 @@ class ModelWorker:
                 sam_server_addr = ret.json()["address"]
             print(f"sam_server_addr: {sam_server_addr}")
             self.sam_server_addr = sam_server_addr
-
-    
 
     def register_to_controller(self):
         logger.info("Register to controller")
@@ -243,13 +246,13 @@ class ModelWorker:
         }
 
     def load_image(self, image_path: str) -> Tuple[np.array, torch.Tensor]:
-        
-
         if os.path.exists(image_path):
             image_source = Image.open(image_path).convert("RGB")
         else:
             # base64 coding
-            image_source = Image.open(BytesIO(base64.b64decode(image_path))).convert("RGB")
+            image_source = Image.open(BytesIO(base64.b64decode(image_path))).convert(
+                "RGB"
+            )
 
         image = np.asarray(image_source)
         image_transformed, _ = self.transform(image_source, None)
@@ -277,12 +280,12 @@ class ModelWorker:
         else:
             # load image and run models
             boxes, logits, phrases = predict(
-                model=model, 
-                image=image, 
-                caption=text_prompt, 
-                box_threshold=box_threshold, 
+                model=model,
+                image=image,
+                caption=text_prompt,
+                box_threshold=box_threshold,
                 text_threshold=text_threshold,
-                device=device
+                device=device,
             )
             boxes = boxes.tolist()
             # round to 2 decimal places
@@ -302,43 +305,47 @@ class ModelWorker:
         if len(boxes) > 0:
             if self.sam_server_addr is None:
                 boxes_tensor = torch.Tensor(boxes).to(device)
-                boxes_xyxy = box_ops.box_cxcywh_to_xyxy(boxes_tensor) * torch.Tensor([w, h, w, h]).to(device)
+                boxes_xyxy = box_ops.box_cxcywh_to_xyxy(boxes_tensor) * torch.Tensor(
+                    [w, h, w, h]
+                ).to(device)
                 self.sam_predictor.set_image(image_np)
-                transformed_boxes = self.sam_predictor.transform.apply_boxes_torch(boxes_xyxy, image_np.shape[:2]).to(device)
+                transformed_boxes = self.sam_predictor.transform.apply_boxes_torch(
+                    boxes_xyxy, image_np.shape[:2]
+                ).to(device)
                 # import ipdb; ipdb.set_trace()
                 masks, _, _ = self.sam_predictor.predict_torch(
-                            point_coords = None,
-                            point_labels = None,
-                            boxes = transformed_boxes,
-                            multimask_output = False,
-                        )
-                masks = masks[:, 0] # B, H, W
+                    point_coords=None,
+                    point_labels=None,
+                    boxes=transformed_boxes,
+                    multimask_output=False,
+                )
+                masks = masks[:, 0]  # B, H, W
 
                 # encoder masks to strs
                 maskrls_list = []
                 for mask in masks:
-                    mask_rle = mask_util.encode(np.array(mask[:, :, None].cpu(), order="F"))[0]
+                    mask_rle = mask_util.encode(
+                        np.array(mask[:, :, None].cpu(), order="F")
+                    )[0]
                     mask_rle["counts"] = mask_rle["counts"].decode("utf-8")
                     maskrls_list.append(mask_rle)
             else:
                 headers = {"User-Agent": "G-SAM Client"}
-                params['boxes'] = boxes
+                params["boxes"] = boxes
                 pred_dict_sam = requests.post(
                     self.sam_server_addr + "/worker_generate",
                     headers=headers,
                     json=params,
                 ).json()
-                maskrls_list = pred_dict_sam['masks_rle']
+                maskrls_list = pred_dict_sam["masks_rle"]
         else:
             maskrls_list = []
-        
 
-        pred_dict['masks_rle'] = maskrls_list
+        pred_dict["masks_rle"] = maskrls_list
         return pred_dict
 
     def generate_gate(self, params):
         try:
-
             ret = {"text": "", "error_code": 0}
             ret = self.generate_stream_func(
                 self.model,
@@ -379,7 +386,6 @@ def create_background_tasks():
     return background_tasks
 
 
-
 @app.post("/worker_generate")
 async def api_generate(request: Request):
     params = await request.json()
@@ -392,9 +398,6 @@ async def api_generate(request: Request):
 @app.post("/worker_get_status")
 async def api_get_status(request: Request):
     return worker.get_status()
-
-
-
 
 
 @app.post("/model_details")
@@ -411,15 +414,13 @@ if __name__ == "__main__":
         "--controller-address", type=str, default="http://localhost:21001"
     )
 
+    parser.add_argument("--model-path", type=str, default="groundingdino_swint_ogc.pth")
     parser.add_argument(
-        "--model-path", type=str, default="groundingdino_swint_ogc.pth"
+        "--model-config",
+        type=str,
+        default="GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py",
     )
-    parser.add_argument(
-        "--model-config", type=str, default="GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
-    )
-    parser.add_argument(
-        "--sam-path", type=str, default="sam_vit_h_4b8939.pth"
-    )
+    parser.add_argument("--sam-path", type=str, default="sam_vit_h_4b8939.pth")
     parser.add_argument(
         "--model-names",
         default="grounding_dino+sam,grounded_sam",
@@ -434,7 +435,6 @@ if __name__ == "__main__":
     parser.add_argument("--sam-server", type=str, default="sam")
     args = parser.parse_args()
     logger.info(f"args: {args}")
-
 
     worker = ModelWorker(
         args.controller_address,

@@ -9,7 +9,7 @@ services:
       dockerfile: ./docker/Dockerfile
     volumes:
       - .:/code:rx
-    command: tini -- /bin/bash -c "/workspace/docker/run_controller.sh"
+    command: tini -- /bin/bash -c "/code/docker/run_controller.sh"
     ports:
       - "10000:10000"
     networks:
@@ -21,7 +21,7 @@ services:
       dockerfile: ./docker/Dockerfile
     volumes:
       - .:/code:rx
-    command: tini -- /bin/bash -c "/workspace/docker/run_webui.sh"
+    command: tini -- /bin/bash -c "/code/docker/run_webui.sh"
     ports:
       - "11000:11000"
     networks:
@@ -36,7 +36,7 @@ services:
     image: bakllava_model:latest
     environment:
       - HUGGINGFACE_API_TOKEN=${HUGGINGFACE_API_TOKEN}
-    command: tini -- /bin/bash -c "/workspace/docker/run_model_worker.sh"
+    command: tini -- /bin/bash -c "/code/docker/run_model_worker.sh"
     volumes:
       - .:/code:rx
       - ./models:/models:rwx
