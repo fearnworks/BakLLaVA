@@ -5,20 +5,22 @@ import gradio as gr
 
 from llava.utils import build_logger
 from dotenv import load_dotenv
-from .about import block_css, learn_more_markdown, title_markdown, tos_markdown
+from webui.about import block_css, learn_more_markdown, title_markdown, tos_markdown
 
 load_dotenv()
-from .config import *
-from .chat import *
-from .model import *
-from .prompt_templates import load_prompt_values, register_config_handlers
-
+from webui.config import *
+from webui.chat import *
+from webui.model import *
+from webui.prompt_templates import load_prompt_values, register_config_handlers
+import webui.state_management as sm
+# import webui.ui_components as UIComponents
 logger = build_logger("gradio_web_server", "logs/gradio_web_server.log")
 
 
 def build_demo():
     saved_values = load_prompt_values()
-
+    # sketch_pad_component = UIComponents.SketchPadComponent()
+    # compose_tab_component = UIComponents.ComposeTabComponent(sketch_pad=sketch_pad_component.get_component())
     textbox = gr.Textbox(
         show_label=False, placeholder="Enter text and press ENTER", container=False
     )
@@ -68,7 +70,10 @@ def build_demo():
                             gr.Markdown(tos_markdown)
                             gr.Markdown(learn_more_markdown)
                             url_params = gr.JSON(visible=True)
-
+                    with gr.Tab("Sandbox"):
+                        gr.Markdown("Hello mate")
+                        # sketch_pad = sketch_pad_component.get_component()
+                        # compose_tab = compose_tab_component.get_component()
                     with gr.Tab("Parameters"):
                         temperature = gr.Slider(
                             minimum=0.0,

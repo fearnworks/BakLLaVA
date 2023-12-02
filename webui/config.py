@@ -3,7 +3,6 @@ import argparse
 import os
 from loguru import logger
 
-
 class AppConfig:
     _instance = None
 
