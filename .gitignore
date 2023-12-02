@@ -2,3 +2,6 @@ models
 *.pyc
 *.egg-info
 .env
+.conda
+.pt
+seem_focall_v1.pt

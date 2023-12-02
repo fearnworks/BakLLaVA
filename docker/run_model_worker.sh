@@ -6,7 +6,7 @@ set -e
 source /miniconda/etc/profile.d/conda.sh
 
 conda activate llava
-
+pip install loguru
 cd /code
 
 

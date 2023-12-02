@@ -107,7 +107,7 @@ def _convert_gpt_causal_lm_to_prefix_lm(model: CAUSAL_GPT_TYPES) -> CAUSAL_GPT_T
         return_dict: Optional[bool] = None,
     ):
         """Wraps original forward to enable PrefixLM attention."""
-
+        logger.info("Forward method called")
         def call_og_forward():
             if isinstance(self, GPTNeoXForCausalLM):
                 return self._original_forward(
@@ -139,6 +139,7 @@ def _convert_gpt_causal_lm_to_prefix_lm(model: CAUSAL_GPT_TYPES) -> CAUSAL_GPT_T
                 )
 
         if bidirectional_mask is None:
+            logger.info("Bidirectional mask is None, calling original forward")
             return call_og_forward()
         assert isinstance(bidirectional_mask, torch.Tensor)
         attn_modules = _get_attn_modules(model)
@@ -167,14 +168,24 @@ def _convert_gpt_causal_lm_to_prefix_lm(model: CAUSAL_GPT_TYPES) -> CAUSAL_GPT_T
             attn_module.bias.data = torch.tril(attn_module.bias.data[0, 0])[None, None]
         return output
 
+
     def generate(self: CAUSAL_GPT_TYPES, *args: tuple, **kwargs: Dict[str, Any]):
         """Wraps original generate to enable PrefixLM attention."""
+        logger.info("Generate method called")
         attn_modules = _get_attn_modules(model)
+
+        logger.info("Setting biases in attention modules")
         for attn_module in attn_modules:
             attn_module.bias.data[:] = 1
+
+        logger.info("Calling original generate method")
         output = self._original_generate(*args, **kwargs)
+
+        logger.info("Resetting attention module biases")
         for attn_module in attn_modules:
             attn_module.bias.data = torch.tril(attn_module.bias.data[0, 0])[None, None]
+
+        logger.info("Generate method completed")
         return output
 
     setattr(model, "forward", MethodType(forward, model))

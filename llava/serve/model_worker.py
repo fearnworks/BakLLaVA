@@ -32,12 +32,15 @@ from llava.constants import (
 )
 from transformers import TextIteratorStreamer
 from threading import Thread
-
+from datetime import datetime
 
 GB = 1 << 30
 
 worker_id = str(uuid.uuid4())[:6]
-logger = build_logger("model_worker", f"logs/model_worker_{worker_id}.log")
+# Format the date and time as a string
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+logger = build_logger("model_worker", f"logs/model_worker_{timestamp}_{worker_id}.log")
 global_counter = 0
 
 model_semaphore = None
@@ -162,6 +165,11 @@ class ModelWorker:
             self.model,
             self.image_processor,
         )
+        logger.info(f"Generate stream: {params}")
+        logger.info(tokenizer)
+        logger.info(model)
+        logger.info(image_processor)
+
 
         prompt = params["prompt"]
         ori_prompt = prompt
@@ -235,7 +243,7 @@ class ModelWorker:
                 }
             ).encode() + b"\0"
             return
-
+        logger.info(stopping_criteria)
         thread = Thread(
             target=model.generate,
             kwargs=dict(
