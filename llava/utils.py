@@ -1,9 +1,6 @@
-import datetime
-import logging
-import logging.handlers
 import os
 import sys
-
+from loguru import logger 
 import requests
 
 from llava.constants import LOGDIR
@@ -18,82 +15,55 @@ moderation_msg = (
 handler = None
 
 
-def build_logger(logger_name, logger_filename):
-    global handler
+def build_logger(logger_name: str, logger_filename: str, output_dir: str = LOGDIR):
+    """
+    Builds a loguru logger with a file sink.
 
-    formatter = logging.Formatter(
-        fmt="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
+    Args:
+        logger_name (str): Name of the logger.
+        logger_filename (str): Filename for the log file.
+
+    Returns:
+        logger: Configured loguru logger instance.
+    """
+    # Set up the log directory
+    os.makedirs(output_dir, exist_ok=True)
+    filename = os.path.join(output_dir, logger_filename)
+
+    # Configure loguru logger
+    logger.remove()
+    logger.add(
+        sys.stdout, colorize=True, format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan> | {message}"
+    )
+    logger.add(
+        filename, rotation="1 day", level="INFO",
+        format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name} | {message}"
     )
 
-    # Set the format of root handlers
-    if not logging.getLogger().handlers:
-        logging.basicConfig(level=logging.INFO)
-    logging.getLogger().handlers[0].setFormatter(formatter)
+    # Configure logger name
+    local_logger = logger.bind(name=logger_name)
 
-    # Redirect stdout and stderr to loggers
-    stdout_logger = logging.getLogger("stdout")
-    stdout_logger.setLevel(logging.INFO)
-    sl = StreamToLogger(stdout_logger, logging.INFO)
-    sys.stdout = sl
+    return local_logger
 
-    stderr_logger = logging.getLogger("stderr")
-    stderr_logger.setLevel(logging.ERROR)
-    sl = StreamToLogger(stderr_logger, logging.ERROR)
-    sys.stderr = sl
-
-    # Get logger
-    logger = logging.getLogger(logger_name)
-    logger.setLevel(logging.INFO)
-
-    # Add a file handler for all loggers
-    if handler is None:
-        os.makedirs(LOGDIR, exist_ok=True)
-        filename = os.path.join(LOGDIR, logger_filename)
-        handler = logging.handlers.TimedRotatingFileHandler(
-            filename, when="D", utc=True
-        )
-        handler.setFormatter(formatter)
-
-        for name, item in logging.root.manager.loggerDict.items():
-            if isinstance(item, logging.Logger):
-                item.addHandler(handler)
-
-    return logger
-
-
-class StreamToLogger(object):
+class StreamToLogger:
     """
-    Fake file-like stream object that redirects writes to a logger instance.
+    Redirects writes to a loguru logger instance.
+
+    Args:
+        log_level (str): Log level for messages written to this stream.
     """
 
-    def __init__(self, logger, log_level=logging.INFO):
-        self.terminal = sys.stdout
-        self.logger = logger
+    def __init__(self, log_level="INFO"):
         self.log_level = log_level
-        self.linebuf = ""
-
-    def __getattr__(self, attr):
-        return getattr(self.terminal, attr)
+        self.linebuf = ''
 
     def write(self, buf):
-        temp_linebuf = self.linebuf + buf
-        self.linebuf = ""
-        for line in temp_linebuf.splitlines(True):
-            # From the io.TextIOWrapper docs:
-            #   On output, if newline is None, any '\n' characters written
-            #   are translated to the system default line separator.
-            # By default sys.stdout.write() expects '\n' newlines and then
-            # translates them so this is still cross platform.
-            if line[-1] == "\n":
-                self.logger.log(self.log_level, line.rstrip())
-            else:
-                self.linebuf += line
+        for line in buf.rstrip().splitlines():
+            logger.log(self.log_level, line.rstrip())
 
     def flush(self):
-        if self.linebuf != "":
-            self.logger.log(self.log_level, self.linebuf.rstrip())
-        self.linebuf = ""
+        pass
+
 
 
 def disable_torch_init():
@@ -104,6 +74,7 @@ def disable_torch_init():
 
     setattr(torch.nn.Linear, "reset_parameters", lambda self: None)
     setattr(torch.nn.LayerNorm, "reset_parameters", lambda self: None)
+
 
 
 def violates_moderation(text):

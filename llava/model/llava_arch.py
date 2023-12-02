@@ -28,8 +28,8 @@ from llava.constants import (
     DEFAULT_IM_START_TOKEN,
     DEFAULT_IM_END_TOKEN,
 )
-
-logger = logging.getLogger(__name__)
+from loguru import logger 
+logger = logger.bind(name=__name__)
 
 
 class LlavaMetaModel:

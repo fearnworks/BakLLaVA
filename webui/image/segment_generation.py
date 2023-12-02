@@ -1,9 +1,10 @@
 import gradio as gr
-from typing import Tuple, Dict, Union
+from typing import Tuple, Dict
 from PIL import Image, ImageOps
 import numpy as np
-import process_image as ImageProcessing
-import SEEM as SEEM
+import webui.image.image_processing as ImageProcessing
+
+from webui.external_loader import SEEM
 
 def get_segments(img: Dict, task: str, reftxt: str, mask_dilate_slider: int, state: Dict) -> Tuple[Image.Image, np.ndarray, np.ndarray, Dict]:
     """
@@ -133,43 +134,3 @@ def changed_objects_handler(mask_dilate_slider: int, state: Dict, evt: gr.Select
     state['changed_objects'].append({'id': obj_id, 'img': new_img, 'text': state['segment_info'][obj_id], 'box': bbox})
     return mask_dilate_slider, state['base_layer_masked'], state
 
-class ImageMask(gr.components.Image):
-    """
-    Custom Gradio Image component with specialized preprocessing for masking.
-
-    Inherits from gr.components.Image and overwrites its preprocessing method.
-    """
-
-    is_template = True
-
-    def __init__(self, **kwargs):
-        """
-        Initialize the ImageMask component.
-
-        Args:
-            **kwargs: Keyword arguments for the Gradio Image component.
-        """
-        super().__init__(source="upload", tool="sketch", interactive=True, **kwargs)
-
-    def preprocess(self, x: Union[str, Dict, None]) -> Union[str, Dict, None]:
-        """
-        Custom preprocessing for the ImageMask component.
-
-        Args:
-            x (Union[str, Dict, None]): The input to be preprocessed.
-
-        Returns:
-            Union[str, Dict, None]: The preprocessed input.
-        """
-        if isinstance(x, str):
-            x = {'image': x, 'mask': x}
-        elif isinstance(x, dict):
-            if x['mask'] is None and x['image'] is None:
-                x
-            elif x['image'] is None:
-                x['image'] = str(x['mask'])
-            elif x['mask'] is None:
-                x['mask'] = str(x['image'])
-        elif x is not None:
-            assert False, 'Unexpected type {0} in ImageMask preprocess()'.format(type(x))
-        return super().preprocess(x)

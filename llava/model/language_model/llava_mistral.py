@@ -13,7 +13,7 @@
 #    limitations under the License.
 
 
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Dict, Any
 
 import torch
 import torch.nn as nn
@@ -26,7 +26,7 @@ from transformers import (
     MistralModel,
     MistralForCausalLM,
 )
-
+from loguru import logger 
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 from ..llava_arch import LlavaMetaModel, LlavaMetaForCausalLM
@@ -137,29 +137,60 @@ class LlavaMistralForCausalLM(MistralForCausalLM, LlavaMetaForCausalLM):
 
     def prepare_inputs_for_generation(
         self,
-        input_ids,
-        past_key_values=None,
-        attention_mask=None,
-        inputs_embeds=None,
-        **kwargs,
-    ):
+        input_ids: torch.Tensor,
+        past_key_values: Optional[torch.Tensor] = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        inputs_embeds: Optional[torch.Tensor] = None,
+        **kwargs: Any
+    ) -> Dict[str, Union[torch.Tensor, Any]]:
+        """
+        Prepares inputs for the generation step in a language model.
+
+        This function is used to prepare the input tensors and other necessary data
+        for the model to generate text. It handles different scenarios like whether
+        past key values (cached hidden states) are available or not, and whether
+        input embeddings or input IDs should be used.
+
+        Args:
+            input_ids (torch.Tensor): Tensor containing input token IDs.
+            past_key_values (Optional[torch.Tensor]): Cached past key values from previous generation steps.
+            attention_mask (Optional[torch.Tensor]): Mask to avoid performing attention on padding token indices.
+            inputs_embeds (Optional[torch.Tensor]): Precomputed embeddings for the input.
+
+        Returns:
+            Dict[str, Union[torch.Tensor, Any]]: A dictionary with prepared model inputs.
+
+        Note:
+            The method modifies `input_ids` to use only the last token for generation if `past_key_values` is present.
+            This is because, in subsequent generation steps, we only need to consider the most recently generated token.
+        """
+
+        logger.info("Preparing inputs for generation step")
+
+        # When past_key_values are available, we only use the last token from input_ids
         if past_key_values:
+            logger.info("Using only the last token from input_ids as past_key_values are present")
             input_ids = input_ids[:, -1:]
 
-        # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
+        # Determine whether to use inputs_embeds or input_ids
         if inputs_embeds is not None and past_key_values is None:
+            logger.info("Using inputs_embeds for the first generation step")
             model_inputs = {"inputs_embeds": inputs_embeds}
         else:
+            logger.info("Using input_ids for generation")
             model_inputs = {"input_ids": input_ids}
 
+        # Update model_inputs with additional parameters
         model_inputs.update(
             {
                 "past_key_values": past_key_values,
                 "use_cache": kwargs.get("use_cache"),
                 "attention_mask": attention_mask,
-                "images": kwargs.get("images", None),
+                "images": kwargs.get("images", None),  # Handling additional custom parameters like images
             }
         )
+
+        logger.info("Model inputs prepared for generation")
         return model_inputs
 
 

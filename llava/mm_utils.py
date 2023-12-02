@@ -1,15 +1,13 @@
-## mm_utils.py
-import logging
-
 from PIL import Image
 from io import BytesIO
 import base64
-
 import torch
 from transformers import StoppingCriteria
 from llava.constants import IMAGE_TOKEN_INDEX
+from loguru import logger
 
-logger = logging.getLogger(__name__)
+# Bind the logger to the current module name
+logger = logger.bind(name=__name__)
 
 
 def load_image_from_base64(image):

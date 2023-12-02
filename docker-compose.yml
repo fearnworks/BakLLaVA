@@ -9,6 +9,8 @@ services:
       dockerfile: ./docker/Dockerfile
     volumes:
       - .:/code:rx
+      - /mnt/e/model_storage/llava_models:/models:rwx
+      - ./output:/output:rwx
     command: tini -- /bin/bash -c "/code/docker/run_controller.sh"
     ports:
       - "10000:10000"
@@ -18,16 +20,23 @@ services:
   webui:
     build:
       context: .
-      dockerfile: ./docker/Dockerfile
+      dockerfile: ./docker/Webui.Dockerfile
     volumes:
       - .:/code:rx
+      - /mnt/e/model_storage/llava_models:/models:rwx
+      - ./output:/output:rwx
     command: tini -- /bin/bash -c "/code/docker/run_webui.sh"
     ports:
       - "11000:11000"
     networks:
       - bakllava
-    depends_on:
-      - controller
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   model_worker:
     build:
@@ -39,7 +48,8 @@ services:
     command: tini -- /bin/bash -c "/code/docker/run_model_worker.sh"
     volumes:
       - .:/code:rx
-      - ./models:/models:rwx
+      - /mnt/e/model_storage/llava_models:/models:rwx
+      - ./output:/output:rwx
     networks:
       - bakllava
     deploy:
@@ -61,7 +71,7 @@ services:
     command:  /bin/bash -c "/code/docker/run_grounded_sam.sh"
     volumes:
       - .:/code:rx
-      - ./models:/models:rwx
+      - /mnt/e/model_storage/llava_models:/models:rwx
     networks:
       - bakllava
     deploy:
